@@ -3,6 +3,8 @@ from . import date
 
 import argparse
 
+__version__ = '0.0.0'
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-v','--verbose', action='store_true', default=False, help='be verbose')
