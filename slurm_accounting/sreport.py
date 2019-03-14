@@ -38,13 +38,15 @@ class SreportCluster(Command):
     def filter(cls, e):
         return e.strip().split('|')
 
-    def __init__(self, skip_groups=False, skip_users=False, verbose=False, remote_host=None):
-        super(SreportCluster, self).__init__('sreport', ['-n', '-p', '-t', 'Hour', 'cluster',
+    def __init__(self, include_header=True, skip_groups=False, skip_users=False, verbose=False,
+                 remote_host=None):
+        super(SreportCluster, self).__init__('sreport', ['-n', '-P', '-t', 'Hour', 'cluster',
                                                         'AccountUtilizationByUser',
                                                         'format=account%30,login%30,used%30'],
                                              SreportCluster.filter, verbose=verbose,
                                              remote_host=remote_host)
 
+        self.include_header = include_header
         self.skip_groups = skip_groups
         self.skip_users = skip_users
 
@@ -57,6 +59,10 @@ class SreportCluster(Command):
             cmdline.append('End=%s' % end)
 
         super_call = super(SreportCluster, self).__call__(cmdline)
+
+        if self.include_header:
+            header = ['account', 'user', 'used(hours)']
+            yield header
 
         for r in super_call:
             if r is None:

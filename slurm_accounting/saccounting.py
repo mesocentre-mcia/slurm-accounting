@@ -12,10 +12,10 @@ def main():
                         help='end date')
     parser.add_argument('-t', '--type', choices=('u', 'g', 'ug'), default='ug', metavar='TYPE',
                         help='report type (u, g or ug)')
+    parser.add_argument('-n','--no-header', dest='header', action='store_false', default=True,
+                        help='don\'t print header')
 
     args = parser.parse_args()
-
-    print args
 
     if args.startdate is not None and args.enddate is not None:
         if args.startdate > args.enddate:
@@ -25,7 +25,12 @@ def main():
     skip_users = 'u' not in args.type
     skip_groups = 'g' not in args.type
 
-    r = sreport.SreportCluster(skip_users=skip_users, skip_groups=skip_groups, verbose=args.verbose)
+    r = sreport.SreportCluster(include_header=args.header, skip_users=skip_users,
+                               skip_groups=skip_groups, verbose=args.verbose)
+
+    if args.header:
+        print 'Period: start=%s end=%s' % (args.startdate, args.enddate)
+        print
 
     for row in r(args.startdate, args.enddate):
-        print row
+        print ','.join(row)
