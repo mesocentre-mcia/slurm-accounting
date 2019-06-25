@@ -145,6 +145,231 @@ def parse_slurm_datetime(s):
 def parse_slurm_date(s):
     return datetime.datetime.strptime(s, "%Y-%m-%d")
 
+def print_date(d):
+    return d.strftime("%Y-%m-%d")
+
+def print_datetime(d):
+    return d.strftime("%Y-%m-%dT%H:%M:%S")
+
+class Bin(object):
+    def new(self):
+        raise NotImplementedError
+
+    def job(self, job):
+        raise NotImplementedError
+
+    def indices(self, indices):
+        return []
+
+    def __getitem__(self, key):
+        raise NotImplementedError
+
+    def __contains__(self, key):
+        return True
+
+    def __str__(self):
+        return str(self[0])
+
+class CpuSecondsBin(Bin):
+    def __init__(self):
+        self.cpuseconds = 0.
+
+    def new(self):
+        return self.__class__()
+
+    def job(self, job):
+        self.cpuseconds += job['cpuseconds']
+
+    def __getitem__(self, key):
+        return self.cpuseconds
+
+class CpuHoursBin(CpuSecondsBin):
+    def __getitem__(self, key):
+        return self.cpuseconds / 3600.
+
+    def __str__(self):
+        return '%.f' % self[0]
+
+class PercentBin(Bin):
+    def __init__(self, bin, refval):
+        self.bin = bin
+        self.refval = refval
+
+    def new(self):
+        return self.__class__(self.bin.new(), self.refval)
+
+    def job(self, job):
+        self.bin.job(job)
+
+    def __getitem__(self, key):
+        return 100. * self.bin[key] / self.refval
+
+    def __str__(self):
+        return '%02.1f%%' % self[0]
+
+
+class JobCountBin(Bin):
+    def __init__(self):
+        self.count = 0.
+
+    def new(self):
+        return self.__class__()
+
+    def job(self, job):
+        self.count += 1
+
+    def __getitem__(self, key):
+        return self.count
+
+
+class GroupingBin(Bin):
+    separators = ('\n', ',', )
+    def __init__(self, hashfunc, orderfunc, newbin):
+        self.hashfunc = hashfunc
+        self.orderfunc = orderfunc
+        self.newbin = newbin
+        self.bindict = {}
+
+    def new(self):
+        return self.__class__(self.newbin.new())
+
+    def job(self, job):
+        keys = self.hashfunc(job)
+
+        if not isinstance(keys, list):
+            keys = [keys]
+
+        for k in keys:
+            if k not in self.bindict:
+                self.bindict[k] = self.newbin.new()
+
+            bin = self.bindict[k]
+            bin.job(job)
+
+    def key_list(self):
+        keys = self.bindict.keys()
+
+        keys.sort(self.orderfunc)
+
+        return keys
+
+    def indices(self, indices):
+        if len(indices) == 0: indices.append([])
+
+        keys = list(set(indices[0] + self.key_list()))
+
+        print_(keys)
+        keys.sort(self.orderfunc)
+        print_(keys)
+
+        subindices = indices[1:]
+        for b in self.bindict.values():
+            subindices = b.indices(subindices)
+
+        return [keys] + subindices
+
+    def __getitem__(self, key):
+        return self.bindict[key]
+
+    def __contains__(self, key):
+        return key in self.bindict
+
+    def __str__(self):
+        return str(self.bindict)
+
+
+class UserGroupingBin(GroupingBin):
+    def __init__(self, newbin):
+        super(UserGroupingBin, self).__init__(lambda j: j['user'],
+                                              lambda l, r: cmp(l, r), newbin)
+
+
+class GroupGroupingBin(GroupingBin):
+    def __init__(self, newbin):
+        super(GroupGroupingBin, self).__init__(lambda j: j['group'],
+                                               lambda l, r: cmp(l, r), newbin)
+
+class StartGroupingBin(GroupingBin):
+    def __init__(self, newbin):
+        def hashfunc(j):
+            return j['start'].split('T')[0]
+        def orderfunc(l, r):
+            ld = parse_slurm_date(l)
+            rd = parse_slurm_date(r)
+
+            return cmp(ld, rd)
+        super(StartGroupingBin, self).__init__(hashfunc, orderfunc, newbin)
+
+
+class DailyGroupingBin(GroupingBin):
+    day = datetime.timedelta(days=1)
+
+    def __init__(self, newbin):
+        def hashfunc(j):
+            # start bin
+            b = parse_slurm_datetime(j['start'])
+
+            # end bin is date of end, ep1 is for correct ending of the while loop
+            ep1 = parse_slurm_date(j['end'].split('T', 1)[0]) + self.day
+
+            ret = []
+            while b < ep1:
+                ret.append(print_date(b))
+                b += self.day
+
+            return ret
+
+        def orderfunc(l, r):
+            ld = parse_slurm_date(l)
+            rd = parse_slurm_date(r)
+
+            return cmp(ld, rd)
+
+        super(DailyGroupingBin, self).__init__(hashfunc, orderfunc, newbin)
+
+    def job(self, job):
+        keys = self.hashfunc(job)
+
+        if not isinstance(keys, list):
+            keys = [keys]
+
+#        print_('job', [job[k] for k in ['jobid', 'ncpus', 'start', 'end', 'cpuseconds']])
+        cpuseconds = 0
+        days = []
+
+        for k in keys:
+
+            if k not in self.bindict:
+                self.bindict[k] = self.newbin.new()
+
+            bin = self.bindict[k]
+
+            dayjob = job.copy()
+            kd = parse_slurm_date(k)
+            kdp1 = kd + self.day
+
+            jstart = parse_slurm_datetime(dayjob['start'])
+            if jstart  < kd:
+                jstart = kd
+                dayjob['start'] = print_datetime(jstart)
+
+            jend = parse_slurm_datetime(dayjob['end'])
+            if jend > kdp1:
+                jend = kdp1
+                dayjob['end'] = print_datetime(jend)
+
+            elapsed = jend - jstart
+            cpus = int(dayjob['ncpus'])
+            dayjob['cpuseconds'] = elapsed.total_seconds() * cpus
+            cpuseconds += dayjob['cpuseconds']
+            days.append((k, cpuseconds))
+
+#            print_('dayjob', [dayjob[k] for k in ['jobid', 'ncpus', 'start', 'end', 'cpuseconds']])
+
+            bin.job(dayjob)
+
+        if job['cpuseconds'] != cpuseconds:
+            print_([job[k] for k in ['jobid', 'ncpus', 'start', 'end', 'cpuseconds']], cpuseconds, days, keys, self.hashfunc(job))
 
 def sreporting(conf_file, report=None, start=None, end=None):
     cfg = config.Config(conf_file)
@@ -170,52 +395,83 @@ def sreporting(conf_file, report=None, start=None, end=None):
     partition = cfg.get(report_section, 'partition', False) or None
     nodes = cfg.get(report_section, 'nodes', False) or None
 
-    jobs = src(start=query_start_date.strftime('%Y-%m-%dT%H:%M:%S'),
-               end=query_end_date.strftime('%Y-%m-%dT%H:%M:%S'), partition=partition, nodes=nodes,
-               states=['RUNNING'])
-
-    n = 0
-    cpuseconds = 0
-    jobs.next()
-    for r in jobs:
-        if r['state'] == 'PENDING':
-            continue
-        jstart = parse_slurm_datetime(r['start'])
-        jend = parse_slurm_datetime(r['end'])
-        if start_date and jend and jend < start_date:
-            continue
-
-        if end_date and jstart and jstart > end_date:
-            continue
-
-        jstart = max(jstart, start_date)
-        if jend is not None:
-            jend = min(jend, end_date)
-        else:
-            jend = end_date
-
-        n += 1
-#        elapsed = parse_elapsed(r['elapsed'])
-        elapsed = jend - jstart
-        cpus = int(r['ncpus'])
-        cpuseconds += elapsed.total_seconds() * cpus
-        
-        #print_(','.join([r[k] for k in src.format] + ['%.2f' % (elapsed.total_seconds()/3600)]))
-
-    print_('jobs=%d' % n, 'cpuhours=%d' % (cpuseconds / 3600), end='')
-
+    maxseconds = 1
     cores = cfg.get(report_section, 'cores', None)
     if cores is not None:
         cores = int(cores)
         duration = (end_date - start_date).total_seconds()
         maxseconds = cores * duration
 
-        print_(' (%.1f%%)' % (100 * cpuseconds / maxseconds), end='')
+    grouping = (DailyGroupingBin(CpuHoursBin()))
+#    grouping = ((CpuHoursBin()))
+    percent_grouping = (PercentBin(CpuSecondsBin(), maxseconds))
 
-    print_()
+
+    jobs = src(start=query_start_date.strftime('%Y-%m-%dT%H:%M:%S'),
+               end=query_end_date.strftime('%Y-%m-%dT%H:%M:%S'), partition=partition, nodes=nodes,
+               states=['RUNNING'])
+
+    cpuseconds = 0
+    jobs.next()
+    for r in jobs:
+        if r['state'] == 'PENDING':
+            continue
+        jstart = parse_slurm_datetime(r['start'])
+        jend = parse_slurm_datetime(r['end']) or end_date
+
+        if jend and jend < start_date:
+            continue
+
+        if jstart > end_date:
+            continue
+
+        jstart = max(jstart, start_date)
+        r['start'] = print_datetime(jstart)
+
+        if jend is not None:
+            jend = min(jend, end_date)
+        else:
+            jend = end_date
+
+        r['end'] = print_datetime(jend)
+
+        elapsed = jend - jstart
+        cpus = int(r['ncpus'])
+        cpuseconds += elapsed.total_seconds() * cpus
+        r['cpuseconds'] = elapsed.total_seconds() * cpus
+
+        grouping.job(r)
+        percent_grouping.job(r)
+
+        #print_(','.join([r[k] for k in src.format] + ['%.2f' % (elapsed.total_seconds()/3600)]))
+
+    indices = grouping.indices([])
+
+    if len(indices) == 0:
+        print_(grouping, end='')
+        if cores is not None:
+            print_('', percent_grouping, end='')
+        print_()
+    elif len(indices) == 1:
+        for i in indices[0]:
+            print_('%s,%s' % (i, grouping[i]))
+    elif len(indices) == 2:
+        y, x = indices
+        print_(',', end='')
+        print_(','.join(x))
+        for i in y:
+            print_(i, end='')
+            for j in x:
+                v = ''
+                if j in grouping[i]:
+                    v = grouping[i][j][0]
+                print_(',%s' % v, end='')
+            print_()
+    else:
+        raise NotImplementedError
 
 def main():
-    parser = argparse.ArgumentParser(description='acconting report')
+    parser = argparse.ArgumentParser(description='accounting report')
     parser.add_argument('report', metavar='REPORT', nargs='?',
                         default=None, help='use section [report:REPORT] '
                         'section in configuration file')
