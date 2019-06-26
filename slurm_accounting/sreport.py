@@ -258,9 +258,7 @@ class GroupingBin(Bin):
 
         keys = list(set(indices[0] + self.key_list()))
 
-        print_(keys)
         keys.sort(self.orderfunc)
-        print_(keys)
 
         subindices = indices[1:]
         for b in self.bindict.values():
@@ -304,7 +302,7 @@ class StartGroupingBin(GroupingBin):
 class DailyGroupingBin(GroupingBin):
     day = datetime.timedelta(days=1)
 
-    def __init__(self, newbin):
+    def __init__(self, newbin, filling=(None, None)):
         def hashfunc(j):
             # start bin
             b = parse_slurm_datetime(j['start'])
@@ -327,6 +325,26 @@ class DailyGroupingBin(GroupingBin):
 
         super(DailyGroupingBin, self).__init__(hashfunc, orderfunc, newbin)
 
+        self.filling = filling
+
+        self.__fill()
+
+    def __fill(self):
+        b, e = self.filling
+
+        if b is None or e is None:
+            return
+
+        keys = self.hashfunc(dict(start=b, end=e))
+
+        for k in keys[:-1]: # don't put a bin on last day
+
+            if k not in self.bindict:
+                self.bindict[k] = self.newbin.new()
+
+    def new(self):
+        return self.__class__(self.newbin.new(), filling)
+
     def job(self, job):
         keys = self.hashfunc(job)
 
@@ -338,12 +356,6 @@ class DailyGroupingBin(GroupingBin):
         days = []
 
         for k in keys:
-
-            if k not in self.bindict:
-                self.bindict[k] = self.newbin.new()
-
-            bin = self.bindict[k]
-
             dayjob = job.copy()
             kd = parse_slurm_date(k)
             kdp1 = kd + self.day
@@ -361,15 +373,19 @@ class DailyGroupingBin(GroupingBin):
             elapsed = jend - jstart
             cpus = int(dayjob['ncpus'])
             dayjob['cpuseconds'] = elapsed.total_seconds() * cpus
+
+            if dayjob['cpuseconds'] == 0:
+                # don't register empty jobs
+                continue
+
             cpuseconds += dayjob['cpuseconds']
             days.append((k, cpuseconds))
 
-#            print_('dayjob', [dayjob[k] for k in ['jobid', 'ncpus', 'start', 'end', 'cpuseconds']])
+            if k not in self.bindict:
+                self.bindict[k] = self.newbin.new()
 
+            bin = self.bindict[k]
             bin.job(dayjob)
-
-        if job['cpuseconds'] != cpuseconds:
-            print_([job[k] for k in ['jobid', 'ncpus', 'start', 'end', 'cpuseconds']], cpuseconds, days, keys, self.hashfunc(job))
 
 def sreporting(conf_file, report=None, start=None, end=None):
     cfg = config.Config(conf_file)
@@ -402,7 +418,7 @@ def sreporting(conf_file, report=None, start=None, end=None):
         duration = (end_date - start_date).total_seconds()
         maxseconds = cores * duration
 
-    grouping = (DailyGroupingBin(CpuHoursBin()))
+    grouping = (DailyGroupingBin(CpuHoursBin(), (print_datetime(start_date), print_datetime(end_date))))
 #    grouping = ((CpuHoursBin()))
     percent_grouping = (PercentBin(CpuSecondsBin(), maxseconds))
 
