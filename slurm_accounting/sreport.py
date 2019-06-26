@@ -343,7 +343,7 @@ class DailyGroupingBin(GroupingBin):
                 self.bindict[k] = self.newbin.new()
 
     def new(self):
-        return self.__class__(self.newbin.new(), filling)
+        return self.__class__(self.newbin.new(), self.filling)
 
     def job(self, job):
         keys = self.hashfunc(job)
@@ -432,15 +432,16 @@ def sreporting(conf_file, report=None, start=None, end=None):
     }
 
     grouping = CpuHoursBin()
+    title = ['cpu_hours']
 
     grouping_spec = cfg.get(report_section, 'grouping', False) or None
     if grouping_spec is not None:
         groupings = [s.strip() for s in grouping_spec.split('*')]
+        title = groupings[:]
         groupings.reverse()
 
         grouping = None
         for g in groupings:
-            print_(g)
             grouping = bins_dict[g](grouping)
 
     percent_grouping = PercentBin(CpuSecondsBin(), maxseconds)
@@ -487,15 +488,18 @@ def sreporting(conf_file, report=None, start=None, end=None):
     indices = grouping.indices([])
 
     if len(indices) == 0:
+        print_(title[0])
         print_(grouping, end='')
         if cores is not None:
             print_('', percent_grouping, end='')
         print_()
     elif len(indices) == 1:
+        print_(','.join(title))
         for i in indices[0]:
             print_('%s,%s' % (i, grouping[i]))
     elif len(indices) == 2:
         y, x = indices
+        print_(','.join(title))
         print_(',', end='')
         print_(','.join(x))
         for i in y:
