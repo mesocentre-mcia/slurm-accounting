@@ -171,7 +171,7 @@ class Bin(object):
         return str(self[0])
 
 class CpuSecondsBin(Bin):
-    def __init__(self):
+    def __init__(self, newbin=None):
         self.cpuseconds = 0.
 
     def new(self):
@@ -209,7 +209,7 @@ class PercentBin(Bin):
 
 
 class JobCountBin(Bin):
-    def __init__(self):
+    def __init__(self, bin=None):
         self.count = 0.
 
     def new(self):
@@ -387,7 +387,9 @@ class DailyGroupingBin(GroupingBin):
             bin = self.bindict[k]
             bin.job(dayjob)
 
+
 def sreporting(conf_file, report=None, start=None, end=None):
+
     cfg = config.Config(conf_file)
 
     query_grace = parse_elapsed(cfg.get('general', 'query_grace', '00:00:00'))
@@ -418,9 +420,30 @@ def sreporting(conf_file, report=None, start=None, end=None):
         duration = (end_date - start_date).total_seconds()
         maxseconds = cores * duration
 
-    grouping = (DailyGroupingBin(CpuHoursBin(), (print_datetime(start_date), print_datetime(end_date))))
-#    grouping = ((CpuHoursBin()))
-    percent_grouping = (PercentBin(CpuSecondsBin(), maxseconds))
+    bins_dict = {
+        'cpu_seconds':CpuSecondsBin,
+        'cpu_hours':CpuHoursBin,
+        #'percent':PercentBin,
+        'job_count':JobCountBin,
+        'user':UserGroupingBin,
+        'group':GroupGroupingBin,
+        'job_start':StartGroupingBin,
+        'daily':lambda b: DailyGroupingBin(b, (print_datetime(start_date), print_datetime(end_date))),
+    }
+
+    grouping = CpuHoursBin()
+
+    grouping_spec = cfg.get(report_section, 'grouping', False) or None
+    if grouping_spec is not None:
+        groupings = [s.strip() for s in grouping_spec.split('*')]
+        groupings.reverse()
+
+        grouping = None
+        for g in groupings:
+            print_(g)
+            grouping = bins_dict[g](grouping)
+
+    percent_grouping = PercentBin(CpuSecondsBin(), maxseconds)
 
 
     jobs = src(start=query_start_date.strftime('%Y-%m-%dT%H:%M:%S'),
