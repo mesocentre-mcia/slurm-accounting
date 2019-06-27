@@ -434,7 +434,7 @@ class MonthlyGroupingBin(SpanGroupingBin):
         return parse_slurm_month(print_month(ret))
 
 
-def sreporting(conf_file, report=None, start=None, end=None):
+def sreporting(conf_file, report=None, grouping_spec=None, start=None, end=None):
 
     cfg = config.Config(conf_file)
 
@@ -469,19 +469,19 @@ def sreporting(conf_file, report=None, start=None, end=None):
     bins_dict = {
         'cpu_seconds':CpuSecondsBin,
         'cpu_hours':CpuHoursBin,
-        #'percent':PercentBin,
         'job_count':JobCountBin,
         'user':UserGroupingBin,
         'group':GroupGroupingBin,
         'job_start':StartGroupingBin,
-        'daily':lambda b: DailyGroupingBin(b, (print_datetime(start_date), print_datetime(end_date))),
-        'monthly':lambda b: MonthlyGroupingBin(b, (print_datetime(start_date), print_datetime(end_date))),
+        'daily':lambda b: DailyGroupingBin(b, filling=(print_datetime(start_date), print_datetime(end_date))),
+        'monthly':lambda b: MonthlyGroupingBin(b, filling=(print_datetime(start_date), print_datetime(end_date))),
     }
 
     grouping = CpuHoursBin()
     title = ['cpu_hours']
 
-    grouping_spec = cfg.get(report_section, 'grouping', False) or None
+    grouping_spec = grouping_spec or cfg.get(report_section, 'grouping', False) or None
+
     if grouping_spec is not None:
         groupings = [s.strip() for s in grouping_spec.split('*')]
         title = groupings[:]
@@ -491,15 +491,11 @@ def sreporting(conf_file, report=None, start=None, end=None):
         for g in groupings:
             grouping = bins_dict[g](grouping)
 
-    percent_grouping = PercentBin(CpuSecondsBin(), maxseconds)
-
-
     jobs = src(start=query_start_date.strftime('%Y-%m-%dT%H:%M:%S'),
                end=query_end_date.strftime('%Y-%m-%dT%H:%M:%S'), partition=partition, nodes=nodes,
                states=['RUNNING'])
 
-    cpuseconds = 0
-    jobs.next()
+    #jobs.next()
     for r in jobs:
         if r['state'] == 'PENDING':
             continue
@@ -524,11 +520,9 @@ def sreporting(conf_file, report=None, start=None, end=None):
 
         elapsed = jend - jstart
         cpus = int(r['ncpus'])
-        cpuseconds += elapsed.total_seconds() * cpus
         r['cpuseconds'] = elapsed.total_seconds() * cpus
 
         grouping.job(r)
-        percent_grouping.job(r)
 
         #print_(','.join([r[k] for k in src.format] + ['%.2f' % (elapsed.total_seconds()/3600)]))
 
@@ -536,10 +530,7 @@ def sreporting(conf_file, report=None, start=None, end=None):
 
     if len(indices) == 0:
         print_(title[0])
-        print_(grouping, end='')
-        if cores is not None:
-            print_('', percent_grouping, end='')
-        print_()
+        print_(grouping)
     elif len(indices) == 1:
         print_(','.join(title))
         for i in indices[0]:
@@ -569,7 +560,9 @@ def main():
                         default=None, help='account jobs from START_DATE')
     parser.add_argument('-e', '--end', metavar='END_DATE',
                         default=None, help='account jobs up to END_DATE')
+    parser.add_argument('-g', '--grouping', metavar='GROUPING_SPEC',
+                        default=None, help='grouping')
 
     args = parser.parse_args()
 
-    sreporting('curta.conf', args.report, start=args.start, end=args.end)
+    sreporting('curta.conf', args.report, grouping_spec=args.grouping, start=args.start, end=args.end)
