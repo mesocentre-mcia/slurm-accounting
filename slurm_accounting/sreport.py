@@ -143,10 +143,23 @@ def parse_slurm_datetime(s):
 
 
 def parse_slurm_date(s):
+    c = s.count('-')
+    if c == 0:
+        s += '-01-01'
+    elif c == 1:
+        s += '-01'
+
     return datetime.datetime.strptime(s, "%Y-%m-%d")
+
+
+def parse_slurm_month(s):
+    return datetime.datetime.strptime(s + '-01', "%Y-%m-%d")
 
 def print_date(d):
     return d.strftime("%Y-%m-%d")
+
+def print_month(d):
+    return d.strftime("%Y-%m")
 
 def print_datetime(d):
     return d.strftime("%Y-%m-%dT%H:%M:%S")
@@ -299,31 +312,15 @@ class StartGroupingBin(GroupingBin):
         super(StartGroupingBin, self).__init__(hashfunc, orderfunc, newbin)
 
 
-class DailyGroupingBin(GroupingBin):
-    day = datetime.timedelta(days=1)
-
-    def __init__(self, newbin, filling=(None, None)):
-        def hashfunc(j):
-            # start bin
-            b = parse_slurm_datetime(j['start'])
-
-            # end bin is date of end, ep1 is for correct ending of the while loop
-            ep1 = parse_slurm_date(j['end'].split('T', 1)[0]) + self.day
-
-            ret = []
-            while b < ep1:
-                ret.append(print_date(b))
-                b += self.day
-
-            return ret
-
+class SpanGroupingBin(GroupingBin):
+    def __init__(self, hashfunc, newbin, filling=(None, None)):
         def orderfunc(l, r):
             ld = parse_slurm_date(l)
             rd = parse_slurm_date(r)
 
             return cmp(ld, rd)
 
-        super(DailyGroupingBin, self).__init__(hashfunc, orderfunc, newbin)
+        super(SpanGroupingBin, self).__init__(hashfunc, orderfunc, newbin)
 
         self.filling = filling
 
@@ -337,10 +334,13 @@ class DailyGroupingBin(GroupingBin):
 
         keys = self.hashfunc(dict(start=b, end=e))
 
-        for k in keys[:-1]: # don't put a bin on last day
+        for k in keys[:-1]: # don't put a bin on last span
 
             if k not in self.bindict:
                 self.bindict[k] = self.newbin.new()
+
+    def next_span(self, date):
+        raise NotImplementedError
 
     def new(self):
         return self.__class__(self.newbin.new(), self.filling)
@@ -353,39 +353,85 @@ class DailyGroupingBin(GroupingBin):
 
 #        print_('job', [job[k] for k in ['jobid', 'ncpus', 'start', 'end', 'cpuseconds']])
         cpuseconds = 0
-        days = []
+        spans = []
 
         for k in keys:
-            dayjob = job.copy()
+            spanjob = job.copy()
             kd = parse_slurm_date(k)
-            kdp1 = kd + self.day
+            kdp1 = self.next_span(kd)
 
-            jstart = parse_slurm_datetime(dayjob['start'])
+            jstart = parse_slurm_datetime(spanjob['start'])
             if jstart  < kd:
                 jstart = kd
-                dayjob['start'] = print_datetime(jstart)
+                spanjob['start'] = print_datetime(jstart)
 
-            jend = parse_slurm_datetime(dayjob['end'])
+            jend = parse_slurm_datetime(spanjob['end'])
             if jend > kdp1:
                 jend = kdp1
-                dayjob['end'] = print_datetime(jend)
+                spanjob['end'] = print_datetime(jend)
 
             elapsed = jend - jstart
-            cpus = int(dayjob['ncpus'])
-            dayjob['cpuseconds'] = elapsed.total_seconds() * cpus
+            cpus = int(spanjob['ncpus'])
+            spanjob['cpuseconds'] = elapsed.total_seconds() * cpus
 
-            if dayjob['cpuseconds'] == 0:
+            if spanjob['cpuseconds'] == 0:
                 # don't register empty jobs
                 continue
 
-            cpuseconds += dayjob['cpuseconds']
-            days.append((k, cpuseconds))
+            cpuseconds += spanjob['cpuseconds']
+            spans.append((k, cpuseconds))
 
             if k not in self.bindict:
                 self.bindict[k] = self.newbin.new()
 
             bin = self.bindict[k]
-            bin.job(dayjob)
+            bin.job(spanjob)
+
+class DailyGroupingBin(SpanGroupingBin):
+    span = datetime.timedelta(days=1)
+
+    def __init__(self, newbin, filling=(None, None)):
+        def hashfunc(j):
+            # start bin
+            b = parse_slurm_datetime(j['start'])
+
+            # end bin is date of end, ep1 is for correct ending of the while loop
+            ep1 = parse_slurm_date(j['end'].split('T', 1)[0]) + self.span
+
+            ret = []
+            while b < ep1:
+                ret.append(print_date(b))
+                b += self.span
+
+            return ret
+
+        super(DailyGroupingBin, self).__init__(hashfunc, newbin, filling)
+
+    def next_span(self, date):
+        return date + self.span
+
+class MonthlyGroupingBin(SpanGroupingBin):
+
+    def __init__(self, newbin, filling=(None, None)):
+        def hashfunc(j):
+            # start bin
+            b = parse_slurm_month(j['start'].split('T', 1)[0].rsplit('-', 1)[0])
+
+            # end bin is date of end, ep1 is for correct ending of the while loop
+            ep1 = self.next_span(parse_slurm_month(j['end'].split('T', 1)[0].rsplit('-', 1)[0]))
+
+            ret = []
+            while b < ep1:
+                ret.append(print_date(b))
+                b = self.next_span(b)
+
+            return ret
+
+        super(MonthlyGroupingBin, self).__init__(hashfunc, newbin, filling)
+
+    def next_span(self, date):
+        ret = date + datetime.timedelta(days=31)
+        return parse_slurm_month(print_month(ret))
 
 
 def sreporting(conf_file, report=None, start=None, end=None):
@@ -429,6 +475,7 @@ def sreporting(conf_file, report=None, start=None, end=None):
         'group':GroupGroupingBin,
         'job_start':StartGroupingBin,
         'daily':lambda b: DailyGroupingBin(b, (print_datetime(start_date), print_datetime(end_date))),
+        'monthly':lambda b: MonthlyGroupingBin(b, (print_datetime(start_date), print_datetime(end_date))),
     }
 
     grouping = CpuHoursBin()
