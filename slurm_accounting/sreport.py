@@ -434,7 +434,7 @@ class MonthlyGroupingBin(SpanGroupingBin):
         return parse_slurm_month(print_month(ret))
 
 
-def sreporting(conf_file, report=None, grouping_spec=None, start=None, end=None):
+def sreporting(conf_file, report=None, grouping_specs=None, start=None, end=None):
 
     cfg = config.Config(conf_file)
 
@@ -477,19 +477,19 @@ def sreporting(conf_file, report=None, grouping_spec=None, start=None, end=None)
         'monthly':lambda b: MonthlyGroupingBin(b, filling=(print_datetime(start_date), print_datetime(end_date))),
     }
 
-    grouping = CpuHoursBin()
-    title = ['cpu_hours']
+    grouping_specs = (grouping_specs or cfg.get(report_section, 'grouping', False) or 'cpu_hours').split(',')
+    groupings = []
+    for grouping_spec in grouping_specs:
 
-    grouping_spec = grouping_spec or cfg.get(report_section, 'grouping', False) or None
-
-    if grouping_spec is not None:
-        groupings = [s.strip() for s in grouping_spec.split('*')]
-        title = groupings[:]
-        groupings.reverse()
+        grouping_def = [s.strip() for s in grouping_spec.split('*')]
+        title = grouping_def + []
+        grouping_def.reverse()
 
         grouping = None
-        for g in groupings:
+        for g in grouping_def:
             grouping = bins_dict[g](grouping)
+        
+        groupings.append((grouping, title))
 
     jobs = src(start=query_start_date.strftime('%Y-%m-%dT%H:%M:%S'),
                end=query_end_date.strftime('%Y-%m-%dT%H:%M:%S'), partition=partition, nodes=nodes,
@@ -522,34 +522,40 @@ def sreporting(conf_file, report=None, grouping_spec=None, start=None, end=None)
         cpus = int(r['ncpus'])
         r['cpuseconds'] = elapsed.total_seconds() * cpus
 
-        grouping.job(r)
+        for grouping, _title in groupings:
+            grouping.job(r)
 
         #print_(','.join([r[k] for k in src.format] + ['%.2f' % (elapsed.total_seconds()/3600)]))
 
-    indices = grouping.indices([])
+    for grouping, title in groupings:
+        indices = grouping.indices([])
 
-    if len(indices) == 0:
-        print_(title[0])
-        print_(grouping)
-    elif len(indices) == 1:
-        print_(','.join(title))
-        for i in indices[0]:
-            print_('%s,%s' % (i, grouping[i]))
-    elif len(indices) == 2:
-        y, x = indices
-        print_(','.join(title))
-        print_(',', end='')
-        print_(','.join(x))
-        for i in y:
-            print_(i, end='')
-            for j in x:
-                v = ''
-                if j in grouping[i]:
-                    v = grouping[i][j][0]
-                print_(',%s' % v, end='')
-            print_()
-    else:
-        raise NotImplementedError
+        if len(indices) == 0:
+            print_(title[0])
+            print_(grouping)
+        elif len(indices) == 1:
+            print_('*'.join(title))
+            for i in indices[0]:
+                print_('%s,%s' % (i, grouping[i]))
+        elif len(indices) == 2:
+            y, x = indices
+            print_('*'.join(title))
+            print_(',', end='')
+            print_(','.join(x))
+            for i in y:
+                print_(i, end='')
+                for j in x:
+                    v = ''
+                    if j in grouping[i]:
+                        v = grouping[i][j][0]
+
+                    print_(',%s' % v, end='')
+
+                print_()
+        else:
+            raise NotImplementedError
+
+        print_()
 
 def main(cfg_path='sreporting.conf'):
     if not os.path.isabs(cfg_path):
@@ -571,4 +577,4 @@ def main(cfg_path='sreporting.conf'):
 
     args = parser.parse_args()
 
-    sreporting(args.cfg, args.report, grouping_spec=args.grouping, start=args.start, end=args.end)
+    sreporting(args.cfg, args.report, grouping_specs=args.grouping, start=args.start, end=args.end)
