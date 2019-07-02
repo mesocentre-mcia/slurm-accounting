@@ -551,7 +551,10 @@ def sreporting(conf_file, report=None, grouping_spec=None, start=None, end=None)
     else:
         raise NotImplementedError
 
-def main():
+def main(cfg_path='sreporting.conf'):
+    if not os.path.isabs(cfg_path):
+        cfg_path = config.find_config_file(__file__, cfg_path)
+
     parser = argparse.ArgumentParser(description='accounting report')
     parser.add_argument('report', metavar='REPORT', nargs='?',
                         default=None, help='use section [report:REPORT] '
@@ -563,6 +566,9 @@ def main():
     parser.add_argument('-g', '--grouping', metavar='GROUPING_SPEC',
                         default=None, help='grouping')
 
+    parser.add_argument('--cfg', metavar='PATH',
+                        default=cfg_path, help='config file')
+
     args = parser.parse_args()
 
-    sreporting('curta.conf', args.report, grouping_spec=args.grouping, start=args.start, end=args.end)
+    sreporting(args.cfg, args.report, grouping_spec=args.grouping, start=args.start, end=args.end)

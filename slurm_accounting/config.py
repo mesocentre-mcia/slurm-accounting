@@ -2,6 +2,7 @@ import os.path
 import logging
 import re
 import datetime
+from six import print_
 
 logger = logging.getLogger("slurm_accounting.config")
 
@@ -106,3 +107,16 @@ def loggerConfig(logger, options):
     logfmt = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s : %(message)s", datefmt = "%Y/%m/%d %H:%M:%S")
     log_handler.setFormatter(logfmt)
     logger.addHandler(log_handler)
+
+def find_config_file(path, conf_relpath):
+    while True:
+        try_path = os.path.join(path, 'etc', conf_relpath)
+        if os.path.exists(try_path):
+            return try_path
+
+        d = os.path.dirname(path)
+
+        if d == path:
+            return None
+
+        path = d
