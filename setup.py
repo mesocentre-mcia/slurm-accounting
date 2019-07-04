@@ -25,7 +25,10 @@ setup(name='slurm-accounting',
 #      url='',
       packages=find_packages('.', exclude=['*.tests']),
       entry_points = {
-        "console_scripts": ['saccounting = slurm_accounting.saccounting:main']
+          "console_scripts": [
+              'saccounting = slurm_accounting.saccounting:main',
+              'sreporting = slurm_accounting.sreport:main',
+          ]
         },
 #      python_requires='>=2.7',
       keywords=['slurm'],
