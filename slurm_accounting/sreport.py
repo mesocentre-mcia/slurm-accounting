@@ -573,7 +573,7 @@ def main(cfg_path='sreporting.conf'):
                         default=None, help='grouping')
 
     parser.add_argument('--cfg', metavar='PATH',
-                        default=cfg_path, help='config file')
+                        default=cfg_path, help='config file (default=%s)' % cfg_path)
 
     args = parser.parse_args()
 
