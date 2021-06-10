@@ -88,12 +88,12 @@ class Sacct(Command):
     def filter(cls, e):
         return e.strip().split('|')
 
-    def __init__(self, verbose=False, remote_host=None):
+    def __init__(self, extra_options=[], verbose=False, remote_host=None):
 
         fmt = 'jobid', 'user', 'elapsed', 'ncpus', 'partition', 'nodelist', 'group', 'start', 'end', 'state'
 
         super(Sacct, self).__init__('sacct', ['-a', '--parsable2', '--noheader', '-X',
-                                              '--format=%s' % ','.join(fmt)],
+                                              '--format=%s' % ','.join(fmt)] + extra_options,
                                              Sacct.filter, verbose=verbose,
                                              remote_host=remote_host)
 
@@ -434,7 +434,7 @@ class MonthlyGroupingBin(SpanGroupingBin):
         return parse_slurm_month(print_month(ret))
 
 
-def sreporting(conf_file, report=None, grouping_specs=None, start=None, end=None):
+def sreporting(conf_file, report=None, grouping_specs=None, start=None, end=None, extra_options=[]):
 
     cfg = config.Config(conf_file)
 
@@ -454,7 +454,7 @@ def sreporting(conf_file, report=None, grouping_specs=None, start=None, end=None
 
     report_section = 'report:' + (report or cfg.get('general', 'default_report'))
 
-    src = Sacct(verbose=False)
+    src = Sacct(extra_options=extra_options, verbose=False)
 
     partition = cfg.get(report_section, 'partition', False) or None
     nodes = cfg.get(report_section, 'nodes', False) or None
@@ -571,10 +571,13 @@ def main(cfg_path='sreporting.conf'):
                         default=None, help='account jobs up to END_DATE')
     parser.add_argument('-g', '--grouping', metavar='GROUPING_SPEC',
                         default=None, help='grouping')
+    parser.add_argument('-o', '--options', metavar='EXTRA_SACCT_OPTIONS',
+                        default='', help='sacct extra options')
 
     parser.add_argument('--cfg', metavar='PATH',
                         default=cfg_path, help='config file (default=%s)' % cfg_path)
 
     args = parser.parse_args()
 
-    sreporting(args.cfg, args.report, grouping_specs=args.grouping, start=args.start, end=args.end)
+    sreporting(args.cfg, args.report, grouping_specs=args.grouping, start=args.start, end=args.end,
+               extra_options=args.options.split())
