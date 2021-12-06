@@ -435,7 +435,6 @@ class MonthlyGroupingBin(SpanGroupingBin):
 
 
 def sreporting(conf_file, report=None, grouping_specs=None, start=None, end=None, extra_options=[]):
-
     cfg = config.Config(conf_file)
 
     query_grace = parse_elapsed(cfg.get('general', 'query_grace', '00:00:00'))
@@ -527,35 +526,40 @@ def sreporting(conf_file, report=None, grouping_specs=None, start=None, end=None
 
         #print_(','.join([r[k] for k in src.format] + ['%.2f' % (elapsed.total_seconds()/3600)]))
 
+    rets = {}
     for grouping, title in groupings:
+        ret = ''
+
         indices = grouping.indices([])
 
         if len(indices) == 0:
-            print_(title[0])
-            print_(grouping)
+            ret += '{}\n'.format(title[0])
+            ret += '{}\n'.format(grouping)
         elif len(indices) == 1:
-            print_('*'.join(title))
+            ret += '{}\n'.format('*'.join(title))
             for i in indices[0]:
-                print_('%s,%s' % (i, grouping[i]))
+                ret += '{}\n'.format('%s,%s' % (i, grouping[i]))
         elif len(indices) == 2:
             y, x = indices
-            print_('*'.join(title))
-            print_(',', end='')
-            print_(','.join(x))
+            ret += '{}\n'.format('*'.join(title))
+            ret += ','
+            ret += '{}\n'.format(','.join(x))
             for i in y:
-                print_(i, end='')
+                ret += i
                 for j in x:
                     v = ''
                     if j in grouping[i]:
                         v = grouping[i][j][0]
 
-                    print_(',%s' % v, end='')
+                    ret += ',%s' % v
 
-                print_()
+                ret += '\n'
         else:
             raise NotImplementedError
 
-        print_()
+        rets['*'.join(title)] = ret
+
+    return rets
 
 def main(cfg_path='sreporting.conf'):
     if not os.path.isabs(cfg_path):
@@ -579,5 +583,8 @@ def main(cfg_path='sreporting.conf'):
 
     args = parser.parse_args()
 
-    sreporting(args.cfg, args.report, grouping_specs=args.grouping, start=args.start, end=args.end,
-               extra_options=args.options.split())
+    rets = sreporting(args.cfg, args.report, grouping_specs=args.grouping, start=args.start, end=args.end,
+                   extra_options=args.options.split())
+
+    for ret in rets.values():
+        print_(ret)
