@@ -6,8 +6,9 @@ from six import print_
 
 logger = logging.getLogger("slurm_accounting.config")
 
-from ConfigParser import SafeConfigParser, NoOptionError, NoSectionError
-
+from six.moves.configparser import (
+    SafeConfigParser, NoOptionError, NoSectionError
+)
 
 class Config(object):
     def __init__(self, config_path):

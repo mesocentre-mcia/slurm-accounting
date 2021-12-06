@@ -1,12 +1,13 @@
 import subprocess
-import os
+improt os
 import re
+import tempfile
 import datetime
 import argparse
 
 from six import print_
 
-import config
+from . import config
 
 
 class Command(object):
@@ -26,19 +27,19 @@ class Command(object):
         if self.verbose:
             print_("Command:", " ".join([repr(e) for e in cmdlist]))
 
-        stdout = os.tmpfile()
-        p = subprocess.Popen(cmdlist, stdout = stdout, stderr = subprocess.STDOUT)
+        with tempfile.TemporaryFile() as stdout:
+            p = subprocess.Popen(cmdlist, stdout = stdout, stderr = subprocess.STDOUT)
 
-        p.wait()
+            p.wait()
 
-        if p.returncode != 0:
-            print_(type(p.returncode))
-            raise subprocess.CalledProcessError(cmd=" ".join(cmdlist), returncode=p.returncode)
+            if p.returncode != 0:
+                print_(type(p.returncode))
+                raise subprocess.CalledProcessError(cmd=" ".join(cmdlist), returncode=p.returncode)
 
-        stdout.seek(0)
+            stdout.seek(0)
 
-        for l in stdout:
-            yield self.output_filter(l)
+            for l in stdout:
+                yield self.output_filter(l)
 
 class SreportCluster(Command):
     @classmethod
@@ -124,7 +125,7 @@ class Sacct(Command):
             if r is None:
                 continue
 
-            yield dict(zip(self.format, r))
+            yield dict(list(zip(self.format, r)))
 
 def parse_elapsed(s):
     days = 0
@@ -132,7 +133,7 @@ def parse_elapsed(s):
     if '-' in s:
         days, hspec = s.split('-',1)
         days = int(days)
-    hours, minutes, seconds = map(int, hspec.split(':'))
+    hours, minutes, seconds = list(map(int, hspec.split(':')))
 
     return datetime.timedelta(days=days, seconds=seconds, minutes=minutes, hours=hours)
 
@@ -260,7 +261,7 @@ class GroupingBin(Bin):
             bin.job(job)
 
     def key_list(self):
-        keys = self.bindict.keys()
+        keys = list(self.bindict.keys())
 
         keys.sort(self.orderfunc)
 
@@ -487,7 +488,7 @@ def sreporting(conf_file, report=None, grouping_specs=None, start=None, end=None
         grouping = None
         for g in grouping_def:
             grouping = bins_dict[g](grouping)
-        
+
         groupings.append((grouping, title))
 
     jobs = src(start=query_start_date.strftime('%Y-%m-%dT%H:%M:%S'),
@@ -584,7 +585,7 @@ def main(cfg_path='sreporting.conf'):
     args = parser.parse_args()
 
     rets = sreporting(args.cfg, args.report, grouping_specs=args.grouping, start=args.start, end=args.end,
-                   extra_options=args.options.split())
+                      extra_options=args.options.split())
 
     for ret in rets.values():
         print_(ret)

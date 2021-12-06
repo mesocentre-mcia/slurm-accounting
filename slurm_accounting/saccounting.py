@@ -1,9 +1,10 @@
 from . import sreport
 from . import date
 
+from six import print_
 import argparse
 
-__version__ = '0.0.0'
+__version__ = '0.0.1'
 
 def main():
     parser = argparse.ArgumentParser()
@@ -31,8 +32,8 @@ def main():
                                skip_groups=skip_groups, verbose=args.verbose)
 
     if args.header:
-        print 'Period: start=%s end=%s' % (args.startdate, args.enddate)
-        print
+        print_(('Period: start=%s end=%s' % (args.startdate, args.enddate)))
+        print_()
 
     for row in r(args.startdate, args.enddate):
-        print ','.join(row)
+        print_(','.join(row))
