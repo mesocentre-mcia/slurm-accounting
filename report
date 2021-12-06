@@ -1,0 +1,129 @@
+#!/usr/bin/env python
+
+import os
+import os.path
+
+
+from datetime import datetime, timedelta
+
+from slurm_accounting.sreport import sreporting
+from slurm_accounting import config
+
+
+def yearly(cfg_path, report_dir, year):
+
+    start = '{}-01-01'.format(year)
+    end = '{}-01-01'.format(year + 1)
+
+    year_dir = os.path.join(report_dir, str(year))
+    report_path = os.path.join(year_dir, 'yearly.csv')
+
+    if os.path.isfile(report_path):
+        return
+
+    print year, 'yearly'
+
+    if not os.path.isdir(year_dir):
+        os.makedirs(year_dir)
+
+    groupings = ['user*cpu_hours', 'cpu_hours']
+    r = sreporting(cfg_path, report='all', grouping_specs=','.join(groupings), start=start, end=end)
+
+    with open(report_path, 'w') as f:
+        for grouping in groupings:
+            f.write('report=all,grouping={},start={},end={}\n\n'.format(grouping, start, end))
+            f.write(r[grouping] + '\n')
+
+def yearly_main(cfg_path, report_dir, year):
+
+    start = '{}-01-01'.format(year)
+    end = '{}-01-01'.format(year + 1)
+
+    year_dir = os.path.join(report_dir, str(year))
+    report_path = os.path.join(year_dir, 'yearly-main.csv')
+
+    if os.path.isfile(report_path):
+        return
+
+    print year, 'yearly_main'
+
+    if not os.path.isdir(year_dir):
+        os.makedirs(year_dir)
+
+    grouping = 'cpu_hours'
+    r = sreporting(cfg_path, report='main', grouping_specs=grouping, start=start, end=end)
+
+    with open(report_path, 'w') as f:
+        f.write('report=all,grouping={},start={},end={}\n\n'.format(grouping, start, end))
+        f.write(r[grouping])
+
+def monthly(cfg_path, report_dir, year, month):
+
+    start_date = datetime(year, month, 1)
+    start = '{}-{}-{}'.format(start_date.year, start_date.month, 1)
+
+    end_date = start_date + timedelta(31)
+    end = '{}-{}-{}'.format(end_date.year, end_date.month, 1)
+
+    month_dir = os.path.join(report_dir, str(year), '{:02d}'.format(month))
+
+    reports = [
+        'all',
+        'main',
+        'visu',
+        'gpu',
+        'imb',
+        'i2m',
+        'preemptible',
+        'preemptible-i2m',
+        'preemptible-imb'
+    ]
+
+    groupings = ['group*cpu_hours', 'cpu_hours']
+
+    for report in reports:
+
+        files = ['{}-{}.csv'.format(report, g) for g in groupings]
+        if all([os.path.isfile(os.path.join(month_dir, f)) for f in files]):
+            continue
+
+        print start_date.year, start_date.month, report, g
+
+        if not os.path.isdir(month_dir):
+            os.makedirs(month_dir)
+
+        rets = sreporting(cfg_path, report=report, grouping_specs=','.join(groupings), start=start, end=end)
+
+        for k, v in rets.items():
+            report_path = os.path.join(month_dir, '{}-{}.csv'.format(report, k))
+
+            with open(report_path, 'w') as f:
+                f.write('report={},grouping={},start={},end={}\n'.format(report, k, start, end))
+                f.write('\n')
+                f.write(v)
+
+    pass
+
+def main(cfg_path='sreporting.conf'):
+    if not os.path.isabs(cfg_path):
+        cfg_path = config.find_config_file(__file__, cfg_path)
+
+    report_dir = os.path.join(os.getcwd(), 'reports')
+
+    today = datetime.today()
+    year_start = 2019
+    year_end = today.year
+
+    for year in range(year_start, year_end + 1):
+        month_end = today.month - 1
+        if year < year_end:
+            yearly(cfg_path, report_dir, year)
+            yearly_main(cfg_path, report_dir, year)
+
+            month_end = 12
+
+        for month in range(1, month_end + 1):
+            monthly(cfg_path, report_dir, year, month)
+
+if __name__ == '__main__':
+    main()
