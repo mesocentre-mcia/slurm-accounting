@@ -1,8 +1,9 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import os
 import os.path
 
+from six import print_
 
 from datetime import datetime, timedelta
 
@@ -21,7 +22,7 @@ def yearly(cfg_path, report_dir, year):
     if os.path.isfile(report_path):
         return
 
-    print year, 'yearly'
+    print_(year, 'yearly')
 
     if not os.path.isdir(year_dir):
         os.makedirs(year_dir)
@@ -45,7 +46,7 @@ def yearly_main(cfg_path, report_dir, year):
     if os.path.isfile(report_path):
         return
 
-    print year, 'yearly_main'
+    print_(year, 'yearly_main')
 
     if not os.path.isdir(year_dir):
         os.makedirs(year_dir)
@@ -76,7 +77,7 @@ def monthly(cfg_path, report_dir, year, month):
         'i2m',
         'preemptible',
         'preemptible-i2m',
-        'preemptible-imb'
+        'preemptible-imb',
     ]
 
     groupings = ['group*cpu_hours', 'cpu_hours']
@@ -87,7 +88,7 @@ def monthly(cfg_path, report_dir, year, month):
         if all([os.path.isfile(os.path.join(month_dir, f)) for f in files]):
             continue
 
-        print start_date.year, start_date.month, report, g
+        print_(start_date.year, start_date.month, report, groupings)
 
         if not os.path.isdir(month_dir):
             os.makedirs(month_dir)
@@ -99,6 +100,51 @@ def monthly(cfg_path, report_dir, year, month):
 
             with open(report_path, 'w') as f:
                 f.write('report={},grouping={},start={},end={}\n'.format(report, k, start, end))
+                f.write('\n')
+                f.write(v)
+
+    pass
+
+def month_daily(cfg_path, report_dir, year, month):
+
+    start_date = datetime(year, month, 1)
+    start = '{}-{}-{}'.format(start_date.year, start_date.month, 1)
+
+    end_date = start_date + timedelta(31)
+    end = '{}-{}-{}'.format(end_date.year, end_date.month, 1)
+
+    month_dir = os.path.join(report_dir, str(year), '{:02d}'.format(month))
+
+    reports = [
+        'all',
+        'main',
+    ]
+
+    groupings = ['daily*cpu_hours']
+
+    for report in reports:
+
+        files = ['{}-{}.csv'.format(report, g) for g in groupings]
+        if all([os.path.isfile(os.path.join(month_dir, f)) for f in files]):
+            continue
+
+        print_(start_date.year, start_date.month, report, groupings)
+
+        if not os.path.isdir(month_dir):
+            os.makedirs(month_dir)
+
+        rets = sreporting(cfg_path, report=report,
+                          grouping_specs=','.join(groupings), start=start,
+                          end=end)
+
+        for k, v in rets.items():
+            report_path = os.path.join(month_dir, '{}-{}.csv'.format(report, k))
+
+            with open(report_path, 'w') as f:
+                f.write('report={},grouping={},start={},end={}\n'.format(report,
+                                                                         k,
+                                                                         start,
+                                                                         end))
                 f.write('\n')
                 f.write(v)
 
@@ -124,6 +170,7 @@ def main(cfg_path='sreporting.conf'):
 
         for month in range(1, month_end + 1):
             monthly(cfg_path, report_dir, year, month)
+            month_daily(cfg_path, report_dir, year, month)
 
 if __name__ == '__main__':
     main()

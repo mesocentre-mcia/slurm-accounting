@@ -53,8 +53,3 @@ class SlurmDate:
         return self.date == other.date
     def __ne__(self, other):
         return self.date != other.date
-
-if __name__ == '__main__':
-    print SlurmDate('2019').date
-    print SlurmDate('2019-02').date
-    print SlurmDate('2019-02-03').date
