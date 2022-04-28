@@ -27,7 +27,7 @@ def yearly(cfg_path, report_dir, year):
     if not os.path.isdir(year_dir):
         os.makedirs(year_dir)
 
-    groupings = ['user*cpu_hours', 'cpu_hours']
+    groupings = ['user*cpu_hours', 'group*cpu_hours', 'cpu_hours']
     r = sreporting(cfg_path, report='all', grouping_specs=','.join(groupings), start=start, end=end)
 
     with open(report_path, 'w') as f:
