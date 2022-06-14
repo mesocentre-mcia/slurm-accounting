@@ -89,16 +89,28 @@ class Sacct(Command):
     def filter(cls, e):
         return e.strip().split('|')
 
-    def __init__(self, extra_options=[], verbose=False, remote_host=None):
+    def __init__(self, format=None, extra_options=[], verbose=False,
+                 remote_host=None):
 
-        fmt = 'jobid', 'user', 'elapsed', 'ncpus', 'partition', 'nodelist', 'group', 'start', 'end', 'state'
+        self.format = format or (
+            'jobid',
+            'user',
+            'elapsed',
+            'ncpus',
+            'partition',
+            'nodelist',
+            'group',
+            'start',
+            'end',
+            'state',
+        )
 
-        super(Sacct, self).__init__('sacct', ['-a', '--parsable2', '--noheader', '-X',
-                                              '--format=%s' % ','.join(fmt)] + extra_options,
-                                             Sacct.filter, verbose=verbose,
-                                             remote_host=remote_host)
-
-        self.format=fmt
+        super(Sacct, self).__init__(
+            'sacct',
+            ['-a', '--parsable2', '--noheader', '-X',
+             '--format=%s' % ','.join(self.format)] + extra_options,
+            Sacct.filter, verbose=verbose,
+            remote_host=remote_host)
 
     def __call__(self, start=None, end=None, partition=None, nodes=None, states=[], other_args=[]):
         cmdline = []
