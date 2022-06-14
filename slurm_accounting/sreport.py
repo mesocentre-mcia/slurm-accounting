@@ -455,7 +455,7 @@ def sreporting(conf_file, report=None, grouping_specs=None, start=None, end=None
     if cores is not None:
         cores = int(cores)
         duration = (end_date - start_date).total_seconds()
-        maxseconds = cores * duration
+        maxseconds = int(cores * duration)
 
     bins_dict = {
         'cpu_seconds':CpuSecondsBin,
@@ -521,6 +521,15 @@ def sreporting(conf_file, report=None, grouping_specs=None, start=None, end=None
     rets = {}
     for grouping, title in groupings:
         ret = ''
+
+        if cores is not None:
+            ret += 'cores,{}\n'.format(cores)
+            ret += 'max_seconds,{}\n'.format(maxseconds)
+            ret += 'max_hours,{}\n'.format(maxseconds // 3600)
+            ret += 'max_daily_hours,{}\n'.format(cores * 24)
+            ret += '\n'
+
+
 
         indices = grouping.indices([])
 
