@@ -4,7 +4,6 @@ from . import date
 from six import print_
 import argparse
 
-__version__ = '0.0.1'
 
 def main():
     parser = argparse.ArgumentParser()

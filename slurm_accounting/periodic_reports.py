@@ -119,11 +119,22 @@ def monthly(cfg_path, report_dir, year, month):
                 f.write(v)
 
 
-def main(cfg_path='sreporting.conf'):
-    if not os.path.isabs(cfg_path):
-        cfg_path = config.find_config_file(__file__, cfg_path)
+def main():
+    import argparse
 
-    report_dir = os.path.join(os.getcwd(), 'reports')
+    parser = argparse.ArgumentParser(description='Gather cluster Slurm accounting reports')
+
+    parser.add_argument('--cfg', metavar='PATH',
+                        default=config.find_config_file(__file__, 'sreporting.conf'),
+                        help='config file')
+
+    parser.add_argument('-d', '--destination-dir', metavar='DIR',
+                        default=os.path.join(os.getcwd(), 'reports'),
+                        help='Reports destination directory')
+
+    args = parser.parse_args()
+
+    report_dir = args.destination_dir
 
     today = datetime.today()
     year_start = 2019
@@ -132,12 +143,12 @@ def main(cfg_path='sreporting.conf'):
     for year in range(year_start, year_end + 1):
         month_end = today.month - 1
         if year < year_end:
-            yearly(cfg_path, report_dir, year)
+            yearly(args.cfg, report_dir, year)
 
             month_end = 12
 
         for month in range(1, month_end + 1):
-            monthly(cfg_path, report_dir, year, month)
+            monthly(args.cfg, report_dir, year, month)
 
 if __name__ == '__main__':
     main()

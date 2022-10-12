@@ -8,7 +8,7 @@ from setuptools import setup, find_packages
 
 version = re.search(
     '^__version__\s*=\s*\'(.*)\'',
-    open('slurm_accounting/saccounting.py').read(),
+    open('slurm_accounting/version.py').read(),
     re.M
     ).group(1)
 
@@ -28,6 +28,7 @@ setup(name='slurm-accounting',
           "console_scripts": [
               'saccounting = slurm_accounting.saccounting:main',
               'sreporting = slurm_accounting.sreport:main',
+              'periodic_reports = slurm_accounting.periodic_reports:main',
           ]
         },
 #      python_requires='>=2.7',
@@ -35,7 +36,7 @@ setup(name='slurm-accounting',
       classifiers=[
         'License :: OSI Approved :: BSD License',
         'Development Status :: 3 - Alpha',
-        'Programming Language :: Python :: 2.7',
+        'Programming Language :: Python :: 3.7',
         'Operating System :: POSIX :: Linux',
         'Topic :: Utilities',
       ],
