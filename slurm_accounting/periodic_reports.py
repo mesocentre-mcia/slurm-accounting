@@ -24,13 +24,13 @@ def yearly(cfg_path, report_dir, year):
     simple_groupings = ['group*cpu_hours', 'cpu_hours']
     daily_groupings = ['daily*cpu_hours'] + simple_groupings
     reports = {
-        'all': daily_groupings,
+        'all': ['user*cpu_hours'] + daily_groupings,
         'main': daily_groupings,
-#        'visu': simple_groupings,
-#        'gpu': simple_groupings,
-#        'imb': simple_groupings,
-#        'i2m': simple_groupings,
-#        'preemptible': simple_groupings,
+        'visu': simple_groupings,
+        'gpu': simple_groupings,
+        'imb': simple_groupings,
+        'i2m': simple_groupings,
+        'preemptible': daily_groupings,
         'preemptible-i2m': daily_groupings,
         'preemptible-imb': daily_groupings,
     }
@@ -137,7 +137,7 @@ def main():
     report_dir = args.destination_dir
 
     today = datetime.today()
-    year_start = 2019
+    year_start = 2021
     year_end = today.year
 
     for year in range(year_start, year_end + 1):
