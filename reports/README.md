@@ -6,7 +6,7 @@ Les rapports générés mensuellement sont mis dans `/gpfs/home/comut/slurm-acco
 
 ## Répertoires
 
-Les fichiers de comptabilité sont classées das `reports/`
+Les fichiers de comptabilité sont classées dans `reports/`
 
 - par année:
   - `2019/*.csv`
@@ -24,10 +24,10 @@ Plusieurs rapports sont situés dans chaque répertoire.
 
 Leur nom dépend du type de rapport et du groupement de la métrique (le nombre d'heures CPU `cpu_hours`): `<rapport>-[<groupement>*]cpu_hours.csv`.
 
-Esemples:
+Exemples:
 - `all-cpu_hours.csv`: rapport `all` (tous les jobs, tous les nœuds), métrique `cpu_hours` globale.
 - `all-group*cpu_hours.csv`: rapport `all` (tous les jobs, tous les nœuds), métrique `cpu_hours` par groupe d'utilisateurs.
-- `all-daily*cpu_hours.csv`: rapport `all` (tous les jobs, tous les nœuds), métrique `cpu_hours` par par jour (groupement `daily`).
+- `all-daily*cpu_hours.csv`: rapport `all` (tous les jobs, tous les nœuds), métrique `cpu_hours` par jour (groupement `daily`).
 
 ### Rapports
 
@@ -65,8 +65,8 @@ Autre extrait:
 
 [report:preemptible]
 partition = preemptible
-nodes=n[001-364],gpu[01-04]
-cores = 11776
+nodes=n[001-364],gpu[01-04],visu[01-04]
+cores = 11904
 
 grouping = user * cpu_hours, group * cpu_hours, cpu_hours
 
@@ -85,7 +85,7 @@ cores = 672
 grouping = user * cpu_hours, monthly * cpu_hours, cpu_hours
 ```
 
-On peut y voir que le rapport `preemptible` comprend tous les jobs de la partition `preemptible` ayant tourné sur les nœuds compute ainsi que les nœuds gpu (en fait tous les nœuds accessibles à la partition, dans ce cas).
+On peut y voir que le rapport `preemptible` comprend tous les jobs de la partition `preemptible` ayant tourné sur les nœuds compute ainsi que les nœuds gpu et visu (en fait tous les nœuds accessibles à la partition, dans ce cas).
 
 Les rapports `preemptible-imb` et `preemptible-i2m` concernent aussi la même partition mais sont limités aux jobs ayant tourné sur les nœuds normalement réservés à ces communautés.
 
