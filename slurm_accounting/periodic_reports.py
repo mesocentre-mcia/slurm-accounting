@@ -2,10 +2,11 @@
 
 import os
 import os.path
+import shutil
 
 from six import print_
 
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from slurm_accounting.sreport import sreporting
 from slurm_accounting import config
@@ -35,32 +36,39 @@ def yearly(cfg_path, report_dir, year):
         'preemptible-imb': daily_groupings,
     }
 
+    modified = False
+
     for report, groupings in reports.items():
-       files = ['{}-{}.csv'.format(report, g) for g in groupings]
-       if all([os.path.isfile(os.path.join(year_dir, f)) for f in files]):
-           continue
+        files = ['{}-{}.csv'.format(report, g) for g in groupings]
+        if all([os.path.isfile(os.path.join(year_dir, f)) for f in files]):
+            continue
 
-       print_(start_date.year, report, groupings)
+        modified = True
 
-       if not os.path.isdir(year_dir):
-           os.makedirs(year_dir)
+        print_(start_date.year, report, groupings)
 
-       rets = sreporting(
-           cfg_path, report=report,
-           grouping_specs=','.join(groupings),
-           start=start,
-           end=end
-       )
+        if not os.path.isdir(year_dir):
+            os.makedirs(year_dir)
 
-       for k, v in rets.items():
-           report_path = os.path.join(year_dir, '{}-{}.csv'.format(report, k))
+        rets = sreporting(
+            cfg_path, report=report,
+            grouping_specs=','.join(groupings),
+            start=start,
+            end=end
+        )
 
-           with open(report_path, 'w') as f:
-               f.write('report={},grouping={},start={},end={}\n'.format(
-                   report, k, start, end
-               ))
-               f.write('\n')
-               f.write(v)
+        for k, v in rets.items():
+            report_path = os.path.join(year_dir, '{}-{}.csv'.format(report, k))
+
+            with open(report_path, 'w') as f:
+                f.write('report={},grouping={},start={},end={}\n'.format(
+                    report, k, start, end
+                ))
+                f.write('\n')
+                f.write(v)
+
+    if modified:
+        shutil.copy(cfg_path, year_dir)
 
 
 def monthly(cfg_path, report_dir, year, month):
@@ -90,11 +98,15 @@ def monthly(cfg_path, report_dir, year, month):
         'preemptible-imb': daily_groupings,
     }
 
+    modified = False
+
     for report, groupings in reports.items():
 
         files = ['{}-{}.csv'.format(report, g) for g in groupings]
         if all([os.path.isfile(os.path.join(month_dir, f)) for f in files]):
             continue
+
+        modified = True
 
         print_(start_date.year, start_date.month, report, groupings)
 
@@ -109,7 +121,10 @@ def monthly(cfg_path, report_dir, year, month):
         )
 
         for k, v in rets.items():
-            report_path = os.path.join(month_dir, '{}-{}.csv'.format(report, k))
+            report_path = os.path.join(
+                month_dir,
+                '{}-{}.csv'.format(report, k)
+            )
 
             with open(report_path, 'w') as f:
                 f.write('report={},grouping={},start={},end={}\n'.format(
@@ -118,15 +133,22 @@ def monthly(cfg_path, report_dir, year, month):
                 f.write('\n')
                 f.write(v)
 
+    if modified:
+        shutil.copy(cfg_path, month_dir)
+
 
 def main():
     import argparse
 
-    parser = argparse.ArgumentParser(description='Gather cluster Slurm accounting reports')
+    parser = argparse.ArgumentParser(
+        description='Gather cluster Slurm accounting reports'
+    )
 
-    parser.add_argument('--cfg', metavar='PATH',
-                        default=config.find_config_file(__file__, 'sreporting.conf'),
-                        help='config file')
+    parser.add_argument(
+        '--cfg', metavar='PATH',
+        default=config.find_config_file(__file__, 'sreporting.conf'),
+        help='config file'
+    )
 
     parser.add_argument('-d', '--destination-dir', metavar='DIR',
                         default=os.path.join(os.getcwd(), 'reports'),
@@ -149,6 +171,7 @@ def main():
 
         for month in range(1, month_end + 1):
             monthly(args.cfg, report_dir, year, month)
+
 
 if __name__ == '__main__':
     main()
