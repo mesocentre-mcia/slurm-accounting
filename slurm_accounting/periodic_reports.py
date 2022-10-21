@@ -24,7 +24,7 @@ def yearly(cfg_path, report_dir, year):
 
     simple_groupings = ['group*cpu_hours', 'cpu_hours']
     daily_groupings = ['daily*cpu_hours'] + simple_groupings
-    user_groupings = ['user*cpu_hours'] + daily_groupings,
+    user_groupings = ['user*cpu_hours'] + daily_groupings
     reports = {
         'all': user_groupings,
         'main': daily_groupings,
@@ -105,6 +105,7 @@ def monthly(cfg_path, report_dir, year, month):
     for report, groupings in reports.items():
 
         files = ['{}-{}.csv'.format(report, g) for g in groupings]
+
         if all([os.path.isfile(os.path.join(month_dir, f)) for f in files]):
             continue
 
