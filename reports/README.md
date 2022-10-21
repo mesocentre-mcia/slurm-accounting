@@ -100,7 +100,7 @@ Ainsi, en combinant les informations de plusieurs rapports, on pourra par exempl
 Les fichiers CSV commencent tous par un entête.
 
 On y lit:
-- en première ligne, le nom du rapport (`all`), le groupement (`cpu_hours`), la date de début et de fin du rapport (mois de septembre).
+- en première ligne, le nom du rapport (`main`), le groupement (`cpu_hours`), la date de début et de fin du rapport (mois de septembre).
 - un deuxième bloc pour simplifier les calculs dans un tableur, qui contient
   - partition: optionnellement la partition des jobs sélectionnés pour ce rapport
   - restrict_to_partitions_nodes: optionnellement la restriction à la liste des partitions sur les nœuds desquelles les jobs sélectionnés pour le rapport ont tourné
