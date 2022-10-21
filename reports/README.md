@@ -4,7 +4,7 @@ Rapports de comptabilité de Curta à destination du Comité des Utilisateurs.
 
 Les rapports générés mensuellement sont mis dans `/gpfs/home/comut/slurm-accounting`
 
-Certaines données ayant un caractère confidentielle, il vous ait demandé de ne pas les communiquer à l'extérieur.
+Certaines données ayant un caractère confidentiel, il vous ait demandé de ne pas les communiquer à l'extérieur.
 
 ## Répertoires
 
