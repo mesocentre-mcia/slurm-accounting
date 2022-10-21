@@ -45,18 +45,21 @@ query_grace=30-00:00:00
 
 default_report=main
 
+
 [report:main]
-nodes = n[001-315],bigmem[01-04]
-cores = 10336
+restrict_to_nodes = n[001-315],bigmem[01-04]
+
 grouping = group * cpu_hours, monthly*cpu_hours, cpu_hours
 
 [report:all]
-cores = 12160
 grouping = group * cpu_hours, monthly*cpu_hours, cpu_hours
+
+[report:longq]
+partition = longq
 
 ```
 
-On peut voir que le rapport `main` restreint les jobs ayant tourné sur les nœuds n001 à n315 et les bigmem. Ca représente 10336 cœurs (valeur informative à modifier si on change les nœuds sur lesquels le rapport est fait).
+On peut voir que le rapport `main` restreint les jobs ayant tourné sur les nœuds n001 à n315 et les bigmem.
 
 Le rapport `all` contient tous les nœuds et toutes les partitions du cluster.
 
@@ -65,31 +68,26 @@ Autre extrait:
 
 ```
 
-[report:preemptible]
-partition = preemptible
-nodes=n[001-364],gpu[01-04],visu[01-04]
-cores = 11904
-
-grouping = user * cpu_hours, group * cpu_hours, cpu_hours
 
 [report:preemptible-imb]
 partition = preemptible
-nodes=n[337-364]
-cores = 896
+restrict_to_partitions_nodes=imb-resources
 
 grouping = user * cpu_hours, monthly * cpu_hours, cpu_hours
 
 [report:preemptible-i2m]
 partition = preemptible
-nodes=n[316-336]
-cores = 672
+restrict_to_partitions_nodes=i2m-resources
 
 grouping = user * cpu_hours, monthly * cpu_hours, cpu_hours
+
+[report:preemptible]
+partition = preemptible
+
+grouping = user * cpu_hours, group * cpu_hours, cpu_hours
 ```
 
-On peut y voir que le rapport `preemptible` comprend tous les jobs de la partition `preemptible` ayant tourné sur les nœuds compute ainsi que les nœuds gpu et visu (en fait tous les nœuds accessibles à la partition, dans ce cas).
-
-Les rapports `preemptible-imb` et `preemptible-i2m` concernent aussi la même partition mais sont limités aux jobs ayant tourné sur les nœuds normalement réservés à ces communautés.
+Les rapports `preemptible-imb` et `preemptible-i2m` concernent la partition préemptible mais sont limités aux jobs ayant tourné sur les nœuds normalement réservés à ces communautés (respectivement `imb-resources` et `i2m-resources`).
 
 Ainsi, en combinant les informations de plusieurs rapports, on pourra par exemple:
 
@@ -97,32 +95,54 @@ Ainsi, en combinant les informations de plusieurs rapports, on pourra par exempl
 - `preemptible-imb-cpu_hours.csv` et  `preemptible-i2m-cpu_hours.csv`: connaître le nombre d'heures CPU récupérées par la communauté MCIA sur les ressources réservées grâce aux jobs préemptibles. En comparant avec `all-cpu_hours.csv`, on peut calculer la proportion que ça représente.
 - etc...
 
-**Note:** Le fichier `sreporting.conf` pouvant changer (affectation de nœuds dans des partitions différentes), on copie la version utilisée au moment de générer le rapport dans le répertoire concerné. Ca signifie aussi que la précision des rapports, surtout les annuels, n'est pas absolue, les changements pouvant intervenir en mileu de période.
-
 ### Format des fichiers CSV
 
 Les fichiers CSV commencent tous par un entête.
 
-Par exemple, pour un fichier `all-cpu_hours.csv`:
+On y lit:
+- en première ligne, le nom du rapport (`all`), le groupement (`cpu_hours`), la date de début et de fin du rapport (mois de septembre).
+- un deuxième bloc pour simplifier les calculs dans un tableur, qui contient
+  - partition: optionnellement la partition des jobs sélectionnés pour ce rapport
+  - restrict_to_partitions_nodes: optionnellement la restriction à la liste des partitions sur les nœuds desquelles les jobs sélectionnés pour le rapport ont tourné
+  - restrict_to_nodes: optionnellement la restriction à la liste des nœuds sur lesquels les jobs sélectionnés pour le rapport ont tourné
+  - selected_nodes: liste des nœuds effectivement sélectionnés pour ce rapport (en tenant compte de la partition et des restrictions)
+  - le nombre de cœurs sélectionnés
+  - le nombre seconds et d'heures CPU maximum dans la période (`cores * (end - start)`)
+  - le nombre d'heures CPU par jour sur ces nœuds
+  
+Par exemple, pour un fichier `main-cpu_hours.csv`:
 
 ```
-report=all,grouping=cpu_hours,start=2022-9-1,end=2022-10-1
+report=main,grouping=cpu_hours,start=2022-9-1,end=2022-10-1
 
-cores,12160
-max_seconds,31518720000
-max_hours,8755200
-max_daily_hours,291840
+restrict_to_nodes,"n[001-315],bigmem[01-04]"
+selected_nodes,"bigmem[01-04],n[001-315]"
+cores,10336
+max_seconds,26790912000
+max_hours,7441920
+max_daily_hours,248064
 
 ...
 ```
 
-On y lit:
-- en première ligne, le nom du rapport (`all`), le groupement (`cpu_hours`), la date de début et de fin du rapport (mois de septembre).
-- un deuxième bloc pour simplifier les calculs dans un tableur, qui contient
-  - le nombre de cœurs (voir la définition du rapport dans `sreporting.conf`)
-  - le nombre seconds et d'heures CPU maximum dns la période (`cores * (end - start)`)
-  - le nombre d'heures CPU par jour sur ces nœuds
-  
+Ou encore:
+
+```
+report=preemptible-imb,grouping=cpu_hours,start=2022-9-1,end=2022-10-1
+
+partition,preemptible
+restrict_to_partitions_nodes,imb-resources
+selected_nodes,"n[337-364]"
+cores,896
+max_seconds,2322432000
+max_hours,645120
+max_daily_hours,21504
+
+...
+```
+
+**Note:** La configuration des partitions pouvant changer (affectation de nœuds dans des partitions différentes, `preemptible` notamment), la précision des rapports, surtout les annuels, n'est pas absolue, les changements pouvant intervenir en mileu de période.
+
 Ensuite, selon le type de groupement, on a une ou plusieurs lignes.
 
 Par exemple, pour `grouping=cpu_hours`:

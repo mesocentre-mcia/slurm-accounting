@@ -9,6 +9,7 @@ from six import print_
 
 from . import config
 
+from .slurm_config import parse_slurm_conf, node_spec_from_list, nodes_procs, parse_node_spec, partition_nodes
 
 class Command(object):
     def __init__(self, cmd, opts=[], output_filter=lambda e: e, verbose=False, remote_host=None):
@@ -439,6 +440,14 @@ class MonthlyGroupingBin(SpanGroupingBin):
 
 
 def sreporting(conf_file, report=None, grouping_specs=None, start=None, end=None, extra_options=[]):
+    # read slurm configuration
+    with open('/etc/slurm/slurm.conf', 'r') as f:
+        slurm_conf = parse_slurm_conf(f)
+
+    slurm_nodes = slurm_conf['nodes']
+    slurm_partitions = slurm_conf['partitions']
+
+    # read report configuration
     cfg = config.Config(conf_file)
 
     query_grace = parse_elapsed(cfg.get('general', 'query_grace', '00:00:00'))
@@ -455,19 +464,56 @@ def sreporting(conf_file, report=None, grouping_specs=None, start=None, end=None
         end_date = parse_slurm_date(end)
         query_end_date = end_date + query_grace
 
+    # select report
     report_section = 'report:' + (report or cfg.get('general', 'default_report'))
 
     src = Sacct(extra_options=extra_options, verbose=False)
 
     partition = cfg.get(report_section, 'partition', False) or None
-    nodes = cfg.get(report_section, 'nodes', False) or None
+
+    selected_nodes = set(slurm_nodes.keys())  # all nodes from cluster
+
+    if partition is not None:
+        # restrict to jobs running nodes from selected partition
+        pnodes = set(partition_nodes(slurm_partitions[partition]))
+        selected_nodes &= pnodes
+
+    node_restriction = False
+
+    restrict_to_partitions_nodes = cfg.get(report_section, 'restrict_to_partitions_nodes', False) or None
+    if restrict_to_partitions_nodes is not None:
+        # restrict to jobs running on nodes from specified partitions nodes 
+
+        restrict_to_partitions_nodes = sorted(restrict_to_partitions_nodes.split(','))
+        for part in restrict_to_partitions_nodes:
+            pnodes = set(partition_nodes(slurm_partitions[part]))
+            selected_nodes &= pnodes
+
+            node_restriction = True
+
+
+    restrict_to_nodes_spec = cfg.get(report_section, 'restrict_to_nodes', False) or None
+    if restrict_to_nodes_spec is not None:
+        # restrict to jobs running on certain nodes
+        nnodes = set(parse_node_spec(restrict_to_nodes_spec))
+        selected_nodes &= nnodes
+
+        node_restriction = True
+
+
+    selected_nodes_spec = None
+    if node_restriction:
+        selected_nodes_spec = node_spec_from_list(list(selected_nodes))
+
+    print(report_section, partition, restrict_to_partitions_nodes, restrict_to_nodes_spec, selected_nodes_spec)
 
     maxseconds = 1
-    cores = cfg.get(report_section, 'cores', None)
-    if cores is not None:
-        cores = int(cores)
-        duration = (end_date - start_date).total_seconds()
-        maxseconds = int(cores * duration)
+    # cores = cfg.get(report_section, 'cores', None)
+    cores = nodes_procs(selected_nodes, slurm_nodes)
+
+    cores = int(cores)
+    duration = (end_date - start_date).total_seconds()
+    maxseconds = int(cores * duration)
 
     bins_dict = {
         'cpu_seconds':CpuSecondsBin,
@@ -495,7 +541,9 @@ def sreporting(conf_file, report=None, grouping_specs=None, start=None, end=None
         groupings.append((grouping, title))
 
     jobs = src(start=query_start_date.strftime('%Y-%m-%dT%H:%M:%S'),
-               end=query_end_date.strftime('%Y-%m-%dT%H:%M:%S'), partition=partition, nodes=nodes,
+               end=query_end_date.strftime('%Y-%m-%dT%H:%M:%S'),
+               partition=partition,
+               nodes=selected_nodes_spec,
                states=['RUNNING'])
 
     #jobs.next()
@@ -534,12 +582,23 @@ def sreporting(conf_file, report=None, grouping_specs=None, start=None, end=None
     for grouping, title in groupings:
         ret = ''
 
-        if cores is not None:
-            ret += 'cores,{}\n'.format(cores)
-            ret += 'max_seconds,{}\n'.format(maxseconds)
-            ret += 'max_hours,{}\n'.format(maxseconds // 3600)
-            ret += 'max_daily_hours,{}\n'.format(cores * 24)
-            ret += '\n'
+        if partition is not None:
+            ret += 'partition,{}\n'.format(partition)
+
+        if restrict_to_partitions_nodes is not None:
+            ret += 'restrict_to_partitions_nodes,{}\n'.format(','.join(restrict_to_partitions_nodes))
+
+        if restrict_to_nodes_spec is not None:
+            ret += 'restrict_to_nodes,"{}"\n'.format(restrict_to_nodes_spec)
+
+        ret += 'selected_nodes,"{}"\n'.format(
+            selected_nodes_spec or node_spec_from_list(list(selected_nodes))
+        )
+        ret += 'cores,{}\n'.format(cores)
+        ret += 'max_seconds,{}\n'.format(maxseconds)
+        ret += 'max_hours,{}\n'.format(maxseconds // 3600)
+        ret += 'max_daily_hours,{}\n'.format(cores * 24)
+        ret += '\n'
 
 
 
