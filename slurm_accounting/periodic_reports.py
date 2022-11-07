@@ -95,7 +95,7 @@ def monthly(cfg_path, report_dir, year, month):
         'gpu': simple_groupings,
         'imb': simple_groupings,
         'i2m': simple_groupings,
-        'preemptible': simple_groupings,
+        'preemptible': daily_groupings,
         'preemptible-i2m': daily_groupings,
         'preemptible-imb': daily_groupings,
     }
