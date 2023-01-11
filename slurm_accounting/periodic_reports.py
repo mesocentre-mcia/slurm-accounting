@@ -4,8 +4,6 @@ import os
 import os.path
 import shutil
 
-from six import print_
-
 from datetime import datetime
 
 from slurm_accounting.sreport import sreporting
@@ -32,7 +30,7 @@ def yearly(cfg_path, report_dir, reports, year):
 
         modified = True
 
-        print_(start_date.year, report, groupings)
+        print(start_date.year, report, groupings)
 
         if not os.path.isdir(year_dir):
             os.makedirs(year_dir)
@@ -82,7 +80,7 @@ def monthly(cfg_path, report_dir, reports, year, month):
 
         modified = True
 
-        print_(start_date.year, start_date.month, report, groupings)
+        print(start_date.year, start_date.month, report, groupings)
 
         if not os.path.isdir(month_dir):
             os.makedirs(month_dir)

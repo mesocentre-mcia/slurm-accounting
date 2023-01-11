@@ -40,6 +40,5 @@ setup(name='slurm-accounting',
         'Topic :: Utilities',
       ],
       install_requires=[
-#      'six>=1.10.0',
       ]
      )

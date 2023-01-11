@@ -5,8 +5,6 @@ import tempfile
 import datetime
 import argparse
 
-from six import print_
-
 from . import config
 
 from .slurm_config import parse_slurm_conf, node_spec_from_list, nodes_procs, parse_node_spec, partition_nodes
@@ -26,7 +24,7 @@ class Command(object):
             cmdlist = ['ssh', self.remote_host] + cmdlist
 
         if self.verbose:
-            print_("Command:", " ".join([repr(e) for e in cmdlist]))
+            print("Command:", " ".join([repr(e) for e in cmdlist]))
 
         with tempfile.TemporaryFile() as stdout:
             p = subprocess.Popen(cmdlist, stdout = stdout, stderr = subprocess.STDOUT)
@@ -34,7 +32,7 @@ class Command(object):
             p.wait()
 
             if p.returncode != 0:
-                print_(type(p.returncode))
+                print(type(p.returncode))
                 raise subprocess.CalledProcessError(cmd=" ".join(cmdlist), returncode=p.returncode)
 
             stdout.seek(0)
@@ -356,7 +354,7 @@ class SpanGroupingBin(GroupingBin):
         if not isinstance(keys, list):
             keys = [keys]
 
-#        print_('job', [job[k] for k in ['jobid', 'ncpus', 'start', 'end', 'cpuseconds']])
+#        print('job', [job[k] for k in ['jobid', 'ncpus', 'start', 'end', 'cpuseconds']])
         cpuseconds = 0
         spans = []
 
@@ -576,7 +574,7 @@ def sreporting(conf_file, report=None, grouping_specs=None, start=None, end=None
         for grouping, _title in groupings:
             grouping.job(r)
 
-        #print_(','.join([r[k] for k in src.format] + ['%.2f' % (elapsed.total_seconds()/3600)]))
+        #print(','.join([r[k] for k in src.format] + ['%.2f' % (elapsed.total_seconds()/3600)]))
 
     rets = {}
     for grouping, title in groupings:
@@ -659,4 +657,4 @@ def main(cfg_path='sreporting.conf'):
                       extra_options=args.options.split())
 
     for ret in rets.values():
-        print_(ret)
+        print(ret)

@@ -2,11 +2,10 @@ import os.path
 import logging
 import re
 import datetime
-from six import print_
 
 logger = logging.getLogger("slurm_accounting.config")
 
-from six.moves.configparser import (
+from configparser import (
     SafeConfigParser, NoOptionError, NoSectionError
 )
 
