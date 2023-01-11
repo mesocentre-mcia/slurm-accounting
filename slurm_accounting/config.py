@@ -92,8 +92,8 @@ class Config(object):
 
         return sections
 
-    def items(self, section):
-        return self.config.items(section)
+    def section(self, section):
+        return dict(self.config.items(section))
 
     def existsOrCreate(self, section, option, value):
         if self.config.has_section(section) and self.config.has_option(section, option):
