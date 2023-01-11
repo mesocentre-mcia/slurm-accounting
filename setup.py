@@ -22,7 +22,7 @@ setup(name='slurm-accounting',
       long_description=long_descr,
       author='Pierre Gay',
       author_email='pierre.gay@u-bordeaux.fr',
-#      url='',
+      url='https://github.com/mesocentre-mcia/slurm-accounting',
       packages=find_packages('.', exclude=['*.tests']),
       entry_points = {
           "console_scripts": [
@@ -31,7 +31,6 @@ setup(name='slurm-accounting',
               'periodic_reports = slurm_accounting.periodic_reports:main',
           ]
         },
-#      python_requires='>=2.7',
       keywords=['slurm'],
       classifiers=[
         'License :: OSI Approved :: BSD License',
