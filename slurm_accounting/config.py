@@ -6,15 +6,15 @@ import datetime
 logger = logging.getLogger("slurm_accounting.config")
 
 from configparser import (
-    SafeConfigParser, NoOptionError, NoSectionError
+    ConfigParser, NoOptionError, NoSectionError, ExtendedInterpolation
 )
 
 class Config(object):
     def __init__(self, config_path):
         try:
-            self.config = SafeConfigParser(allow_no_value = True)
+            self.config = ConfigParser(allow_no_value = True, interpolation=ExtendedInterpolation())
         except TypeError:
-            self.config = SafeConfigParser()
+            self.config = ConfigParser()
 
         self.config_path = config_path
         self.bootstrapFile()
